@@ -1,0 +1,286 @@
+<?php
+/**
+ * Created by PhpStorm.
+ * User: gloria
+ * Date: 3/19/18
+ * Time: 11:34 AM
+ */
+
+use \Drupal\playground_mail\FormattedEntityList;
+
+/* new mail and theme template stuff */
+/**
+ * Implements hook_install().
+ */
+function playground_mail_install(){
+    // set default mail class to custom mail for emails sent from this module
+    $config_mail = Drupal::configFactory()->getEditable("system.mail");
+    $config_mail
+        ->set('interface.playground_mail', 'custom_playground_mail')
+        ->save();
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function playground_mail_uninstall() {
+    $config_mail = \Drupal::configFactory()->getEditable('system.mail');
+    $mail_plugins = $config_mail->get('interface');
+    unset($mail_plugins['playground_mail']);
+    $config_mail->set('interface', $mail_plugins)->save();
+}
+
+/**
+ * Implements hook_theme()
+ * @return array
+ */
+function playground_mail_theme() {
+
+    return [
+        'mail_create_node'=> [
+            'variables'=> [
+                'styles'=> [],
+                'node'=> [],
+                'node_type'=> '',
+                'user'=>[],
+                'admin_options'=>NULL,
+            ],
+        ],
+        'mail_change_node'=> [
+            'variables'=> [
+                'styles'=>[],
+                'safe'=> [],
+                'node'=> [],
+                'node_type'=> '',
+                'user'=>[],
+                'diffs'=> NULL,
+               'admin_options'=> NULL,
+                'highlight'=> NULL,
+            ],
+        ],
+    ];
+}
+
+/**
+ * Implements hook_mail()
+ * @param $key
+ * @param $message
+ * @param $params
+ */
+function playground_mail_mail($key, &$message, $params) {
+
+    // html emails
+    $renderer = \Drupal::service('renderer');
+    $message['from'] = \Drupal::configFactory()->get('system.site')->get('mail');
+    $message['headers']['Content-Type'] = "text/html; charset=utf-8; format=flowed; delsp=yes";
+    $options = array(
+        'langcode' => $message['langcode'],
+    );
+
+
+    switch ($key) {
+        case 'mail_create_node':
+            // node mail creation template
+            $create_node_body = [
+                '#styles'=> [
+                    'border_color'=> Drupal::config('playground_mail.settings')->get('border_color'),
+                    'background_color' => Drupal::config('playground_mail.settings')->get('background_color'),
+                    'text_color'=> Drupal::config('playground_mail.settings')->get('text_color'),
+                    'font_size' => \Drupal::config('playground_mail.settings')->get('font_size').\Drupal::config('playground_mail.settings')->get('font_unit'),
+                    'link_color' => \Drupal::config('playground_mail.settings')->get('link_color'),
+                ],
+                '#theme' => 'mail_create_node',
+                '#node' => $params['node'] ?: [],
+                '#node_type'=> $params['node_type'],
+                '#user' => $params['user'] ?: [],
+                '#admin_options' => $params['admin_options'] ?: NULL,
+            ];
+            $message['subject'] = t('New @node_type added @state: @title', array(
+                '@node_type'=> $params['node_type'],
+                '@state'=> $params['node']['state_name']? "in ".$params['node']['state_name']:"",
+                '@title' => $params['node']['title']), $options);
+            $message['body'][] = $renderer->renderPlain($create_node_body);
+            break;
+
+        case 'mail_change_node':
+            // node mail changes template
+            $change_node_body = [
+                '#styles'=> [
+                  'border_color'=> Drupal::config('playground_mail.settings')->get('border_color'),
+                  'background_color' => Drupal::config('playground_mail.settings')->get('background_color'),
+                  'text_color'=> Drupal::config('playground_mail.settings')->get('text_color'),
+                  'font_size' => \Drupal::config('playground_mail.settings')->get('font_size').\Drupal::config('playground_mail.settings')->get('font_unit'),
+                  'link_color' => \Drupal::config('playground_mail.settings')->get('link_color'),
+                ],
+                '#theme' => 'mail_change_node',
+                '#node' => $params['node'] ?: [],
+                '#node_type'=> $params['node_type'],
+                '#user' => $params['user'] ?: [],
+                '#safe' => $params['safe'] ?: [],
+                '#diffs' => $params['diffs'] ?: NULL,
+                '#highlight' => $params['highlight']['changes'] ?: NULL,
+                '#admin_options' => $params['admin_options'] ?: NULL,
+            ];
+
+            $message['subject'] = t('@node_type has been changed @state: @title', array(
+                '@node_type'=> $params['node_type'],
+                '@state'=> $params['node']['state_name']? "in ".$params['node']['state_name']:"",
+                '@title' => $params['node']['title']), $options);
+
+            $message['body'][] = $renderer->renderPlain($change_node_body);
+            break;
+    }
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_insert()
+ * @param \Drupal\node\NodeInterface $node
+ */
+function playground_mail_node_insert(\Drupal\node\NodeInterface $node) {
+    $content_types = \Drupal::config('playground_mail.settings')->get('content_type_notify') ?: [];
+    $content_type_selected = in_array($node->getType(), $content_types, TRUE);
+
+    $is_admin = in_array("administrator", \Drupal::currentUser()->getRoles()) ?: false;
+    $is_checked_admin = (\Drupal::config('playground_mail.settings')->get('send_to_admins') !== 0) ?: false;
+
+    if($content_type_selected && (!$is_admin || $is_checked_admin)) {
+
+        $mailManager = \Drupal::service('plugin.manager.mail');
+
+        $params = (new FormattedEntityList($node))->getAllParams();
+        $params['admin_options']['accept'] = \Drupal\Core\Url::fromRoute('entity.node.edit_form', ['node'=>$node->id()]);
+        $params['admin_options']['delete'] = \Drupal\Core\Url::fromRoute('entity.node.delete_form', ['node'=>$node->id()]);
+
+        $module = 'playground_mail';
+        $key = 'mail_create_node';
+
+        $to = \Drupal::config('playground_mail.settings')->get('to_email');
+
+        if(isset($to)) {
+            $send = true;
+        } else {
+            $send = false;
+        }
+        $langcode = \Drupal::currentUser()->getPreferredLangcode();
+        $mailManager->mail($module, $key, $to, $langcode, $params, NULL, $send);
+    }
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_presave()
+ * @param \Drupal\node\NodeInterface $node
+ */
+function playground_mail_node_presave(\Drupal\node\NodeInterface $node) {
+
+    $content_types = \Drupal::config('playground_mail.settings')->get('content_type_notify') ?: [];
+    $content_type_selected = in_array($node->getType(), $content_types, TRUE);
+
+    if(!$content_type_selected){
+        return;
+    }
+    else {
+        if($node->isNew()) {
+            return;
+        } else {
+            $is_admin = in_array("administrator", \Drupal::currentUser()->getRoles()) ?: false;
+
+            if(!$is_admin) {
+                $node->isDefaultRevision(false);
+            }
+
+            $differences = (new FormattedEntityList($node))->getOriginalDifferenceKeys();
+
+            $node->setRevisionLogMessage(t("Changed by @user. Changes were made on the following fields: @diffs", [
+                '@user' => \Drupal::currentUser()->getEmail(),
+                '@diffs' => implode(", ", $differences),
+            ]));
+
+
+            if($node->getOwner()->isAnonymous()) {
+                $node->setOwner(\Drupal\user\Entity\User::load(1));
+            }
+            if($node->getRevisionUser()->isAnonymous()) {
+                $node->setRevisionUser(\Drupal\user\Entity\User::load(1));
+            }
+
+        }
+    }
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_update()
+ * @param \Drupal\node\NodeInterface $node
+ */
+
+function playground_mail_node_update(\Drupal\node\NodeInterface $node) {
+    $content_types = \Drupal::config('playground_mail.settings')->get('content_type_notify') ?: [];
+    $content_type_selected = in_array($node->getType(), $content_types, TRUE);
+
+    $is_admin = in_array("administrator", \Drupal::currentUser()->getRoles()) ?: false;
+    $is_checked_admin = (\Drupal::config('playground_mail.settings')->get('send_to_admins') !== 0) ?: false;
+
+    if($content_type_selected && (!$is_admin || $is_checked_admin)) {
+        /** @var FormattedEntityList $properties */
+        $properties = new FormattedEntityList($node);
+        $params = $properties->getAllParams();
+        $differences = $properties->getOriginalDifferenceKeys();
+
+        /** @var FormattedEntityList $original_properties */
+        $original_properties = new FormattedEntityList($node->original);
+        $params['safe'] = $original_properties->getAllParams();
+        $params['diffs'] = $differences;
+        $highlight = \Drupal::config('playground_mail.settings')->get('color_highlight');
+        if($highlight !== NULL) {
+            $params['highlight']['changes'] = [];
+            foreach($highlight as $key => $property) {
+                if($property === 0){
+                    $params['highlight']['changes'][$key] = false;
+                } else {
+                    $params['highlight']['changes'][$key] = true;
+                }
+            }
+        }
+
+
+        if($node->getRevisionId() !== NULL) {
+            $params['admin_options']['accept'] =  \Drupal\Core\Url::fromUserInput("/node/".$node->id()."/revisions/".$node->getRevisionId()."/revert");
+            $params['admin_options']['delete'] =  \Drupal\Core\Url::fromUserInput("/node/".$node->id()."/revisions/".$node->getRevisionId()."/delete");
+        }
+
+        $mailManager = \Drupal::service('plugin.manager.mail');
+        $module = 'playground_mail';
+        $key = 'mail_change_node';
+        $to = \Drupal::config('playground_mail.settings')->get('to_email');
+
+        if(isset($to) && count($params['diffs']) > 0) {
+            $send = true;
+        } else {
+            $send = false;
+        }
+        $langcode = \Drupal::currentUser()->getPreferredLangcode();
+        $mailManager->mail($module, $key, $to, $langcode, $params, NULL, $send);
+    }
+}
+
+/**
+ * Implements hook_preprocess_HOOK()
+ * @param $variables
+ */
+
+function playground_mail_preprocess_mail_change_node(&$variables) {
+    $variables['#cache']['max-age'] = 0;
+}
+
+/**
+ * Implements hook_preprocess_HOOK()
+ * @param $variables
+ */
+
+function playground_mail_preprocess_mail_create_node(&$variables) {
+    $variables['#cache']['max-age'] = 0;
+}
+
+
+
+
+
