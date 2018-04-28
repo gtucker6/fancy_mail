@@ -6,27 +6,27 @@
  * Time: 11:34 AM
  */
 
-use \Drupal\playground_mail\FormattedEntityList;
+use \Drupal\fancy_mail\FormattedEntityList;
 
 /* new mail and theme template stuff */
 /**
  * Implements hook_install().
  */
-function playground_mail_install(){
+function fancy_mail_install(){
     // set default mail class to custom mail for emails sent from this module
     $config_mail = Drupal::configFactory()->getEditable("system.mail");
     $config_mail
-        ->set('interface.playground_mail', 'custom_playground_mail')
+        ->set('interface.fancy_mail', 'fancy_mailer')
         ->save();
 }
 
 /**
  * Implements hook_uninstall().
  */
-function playground_mail_uninstall() {
+function fancy_mail_uninstall() {
     $config_mail = \Drupal::configFactory()->getEditable('system.mail');
     $mail_plugins = $config_mail->get('interface');
-    unset($mail_plugins['playground_mail']);
+    unset($mail_plugins['fancy_mail']);
     $config_mail->set('interface', $mail_plugins)->save();
 }
 
@@ -34,7 +34,7 @@ function playground_mail_uninstall() {
  * Implements hook_theme()
  * @return array
  */
-function playground_mail_theme() {
+function fancy_mail_theme() {
 
     return [
         'mail_create_node'=> [
@@ -67,7 +67,7 @@ function playground_mail_theme() {
  * @param $message
  * @param $params
  */
-function playground_mail_mail($key, &$message, $params) {
+function fancy_mail_mail($key, &$message, $params) {
 
     // html emails
     $renderer = \Drupal::service('renderer');
@@ -83,11 +83,11 @@ function playground_mail_mail($key, &$message, $params) {
             // node mail creation template
             $create_node_body = [
                 '#styles'=> [
-                    'border_color'=> Drupal::config('playground_mail.settings')->get('border_color'),
-                    'background_color' => Drupal::config('playground_mail.settings')->get('background_color'),
-                    'text_color'=> Drupal::config('playground_mail.settings')->get('text_color'),
-                    'font_size' => \Drupal::config('playground_mail.settings')->get('font_size').\Drupal::config('playground_mail.settings')->get('font_unit'),
-                    'link_color' => \Drupal::config('playground_mail.settings')->get('link_color'),
+                    'border_color'=> Drupal::config('fancy_mail.settings')->get('border_color'),
+                    'background_color' => Drupal::config('fancy_mail.settings')->get('background_color'),
+                    'text_color'=> Drupal::config('fancy_mail.settings')->get('text_color'),
+                    'font_size' => \Drupal::config('fancy_mail.settings')->get('font_size').\Drupal::config('fancy_mail.settings')->get('font_unit'),
+                    'link_color' => \Drupal::config('fancy_mail.settings')->get('link_color'),
                 ],
                 '#theme' => 'mail_create_node',
                 '#node' => $params['node'] ?: [],
@@ -106,11 +106,11 @@ function playground_mail_mail($key, &$message, $params) {
             // node mail changes template
             $change_node_body = [
                 '#styles'=> [
-                  'border_color'=> Drupal::config('playground_mail.settings')->get('border_color'),
-                  'background_color' => Drupal::config('playground_mail.settings')->get('background_color'),
-                  'text_color'=> Drupal::config('playground_mail.settings')->get('text_color'),
-                  'font_size' => \Drupal::config('playground_mail.settings')->get('font_size').\Drupal::config('playground_mail.settings')->get('font_unit'),
-                  'link_color' => \Drupal::config('playground_mail.settings')->get('link_color'),
+                    'border_color'=> Drupal::config('fancy_mail.settings')->get('border_color'),
+                    'background_color' => Drupal::config('fancy_mail.settings')->get('background_color'),
+                    'text_color'=> Drupal::config('fancy_mail.settings')->get('text_color'),
+                    'font_size' => \Drupal::config('fancy_mail.settings')->get('font_size').\Drupal::config('fancy_mail.settings')->get('font_unit'),
+                    'link_color' => \Drupal::config('fancy_mail.settings')->get('link_color'),
                 ],
                 '#theme' => 'mail_change_node',
                 '#node' => $params['node'] ?: [],
@@ -136,12 +136,12 @@ function playground_mail_mail($key, &$message, $params) {
  * Implements hook_ENTITY_TYPE_insert()
  * @param \Drupal\node\NodeInterface $node
  */
-function playground_mail_node_insert(\Drupal\node\NodeInterface $node) {
-    $content_types = \Drupal::config('playground_mail.settings')->get('content_type_notify') ?: [];
+function fancy_mail_node_insert(\Drupal\node\NodeInterface $node) {
+    $content_types = \Drupal::config('fancy_mail.settings')->get('content_type_notify') ?: [];
     $content_type_selected = in_array($node->getType(), $content_types, TRUE);
 
     $is_admin = in_array("administrator", \Drupal::currentUser()->getRoles()) ?: false;
-    $is_checked_admin = (\Drupal::config('playground_mail.settings')->get('send_to_admins') !== 0) ?: false;
+    $is_checked_admin = (\Drupal::config('fancy_mail.settings')->get('send_to_admins') !== 0) ?: false;
 
     if($content_type_selected && (!$is_admin || $is_checked_admin)) {
 
@@ -151,12 +151,12 @@ function playground_mail_node_insert(\Drupal\node\NodeInterface $node) {
         $params['admin_options']['accept'] = \Drupal\Core\Url::fromRoute('entity.node.edit_form', ['node'=>$node->id()]);
         $params['admin_options']['delete'] = \Drupal\Core\Url::fromRoute('entity.node.delete_form', ['node'=>$node->id()]);
 
-        $module = 'playground_mail';
+        $module = 'fancy_mail';
         $key = 'mail_create_node';
 
-        $to = \Drupal::config('playground_mail.settings')->get('to_email');
+        $to = \Drupal::config('fancy_mail.settings')->get('to_email');
 
-        if(isset($to)) {
+        if(isset($to) && !\Drupal::currentUser()->isAnonymous()) {
             $send = true;
         } else {
             $send = false;
@@ -170,9 +170,9 @@ function playground_mail_node_insert(\Drupal\node\NodeInterface $node) {
  * Implements hook_ENTITY_TYPE_presave()
  * @param \Drupal\node\NodeInterface $node
  */
-function playground_mail_node_presave(\Drupal\node\NodeInterface $node) {
+function fancy_mail_node_presave(\Drupal\node\NodeInterface $node) {
 
-    $content_types = \Drupal::config('playground_mail.settings')->get('content_type_notify') ?: [];
+    $content_types = \Drupal::config('fancy_mail.settings')->get('content_type_notify') ?: [];
     $content_type_selected = in_array($node->getType(), $content_types, TRUE);
 
     if(!$content_type_selected){
@@ -212,12 +212,12 @@ function playground_mail_node_presave(\Drupal\node\NodeInterface $node) {
  * @param \Drupal\node\NodeInterface $node
  */
 
-function playground_mail_node_update(\Drupal\node\NodeInterface $node) {
-    $content_types = \Drupal::config('playground_mail.settings')->get('content_type_notify') ?: [];
+function fancy_mail_node_update(\Drupal\node\NodeInterface $node) {
+    $content_types = \Drupal::config('fancy_mail.settings')->get('content_type_notify') ?: [];
     $content_type_selected = in_array($node->getType(), $content_types, TRUE);
 
     $is_admin = in_array("administrator", \Drupal::currentUser()->getRoles()) ?: false;
-    $is_checked_admin = (\Drupal::config('playground_mail.settings')->get('send_to_admins') !== 0) ?: false;
+    $is_checked_admin = (\Drupal::config('fancy_mail.settings')->get('send_to_admins') !== 0) ?: false;
 
     if($content_type_selected && (!$is_admin || $is_checked_admin)) {
         /** @var FormattedEntityList $properties */
@@ -229,7 +229,7 @@ function playground_mail_node_update(\Drupal\node\NodeInterface $node) {
         $original_properties = new FormattedEntityList($node->original);
         $params['safe'] = $original_properties->getAllParams();
         $params['diffs'] = $differences;
-        $highlight = \Drupal::config('playground_mail.settings')->get('color_highlight');
+        $highlight = \Drupal::config('fancy_mail.settings')->get('color_highlight');
         if($highlight !== NULL) {
             $params['highlight']['changes'] = [];
             foreach($highlight as $key => $property) {
@@ -248,11 +248,11 @@ function playground_mail_node_update(\Drupal\node\NodeInterface $node) {
         }
 
         $mailManager = \Drupal::service('plugin.manager.mail');
-        $module = 'playground_mail';
+        $module = 'fancy_mail';
         $key = 'mail_change_node';
-        $to = \Drupal::config('playground_mail.settings')->get('to_email');
+        $to = \Drupal::config('fancy_mail.settings')->get('to_email');
 
-        if(isset($to) && count($params['diffs']) > 0) {
+        if(isset($to) && count($params['diffs']) > 0 && !\Drupal::currentUser()->isAnonymous()) {
             $send = true;
         } else {
             $send = false;
@@ -267,7 +267,7 @@ function playground_mail_node_update(\Drupal\node\NodeInterface $node) {
  * @param $variables
  */
 
-function playground_mail_preprocess_mail_change_node(&$variables) {
+function fancy_mail_preprocess_mail_change_node(&$variables) {
     $variables['#cache']['max-age'] = 0;
 }
 
@@ -276,7 +276,7 @@ function playground_mail_preprocess_mail_change_node(&$variables) {
  * @param $variables
  */
 
-function playground_mail_preprocess_mail_create_node(&$variables) {
+function fancy_mail_preprocess_mail_create_node(&$variables) {
     $variables['#cache']['max-age'] = 0;
 }
 
