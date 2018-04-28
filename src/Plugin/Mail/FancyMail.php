@@ -12,7 +12,7 @@ use Drupal\Core\Site\Settings;
  * Defines the default Drupal mail backend, using PHP's native mail() function.
  *
  * @Mail(
- *   id = "fancy_mail",
+ *   id = "fancy_mailer",
  *   label = @Translation("Custom mailer"),
  *   description = @Translation("Sends the message as html using the php's native mail() function")
  * )
