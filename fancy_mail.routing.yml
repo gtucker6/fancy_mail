@@ -1,7 +1,7 @@
-playground_mail.email_settings:
-  path: '/admin/config/playground_mail/email_settings'
+fancy_mail.email_settings:
+  path: '/admin/config/fancy_mail/email_settings'
   defaults:
-    _title: 'Playground Mail Settings'
-    _form: 'Drupal\playground_mail\Form\EmailSettingsForm'
+    _title: 'Fancy Mail Settings'
+    _form: 'Drupal\fancy_mail\Form\EmailSettingsForm'
   requirements:
     _permission: 'administer site configuration'
