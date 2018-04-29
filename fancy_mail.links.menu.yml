@@ -1,6 +1,5 @@
-playground_mail.email_settings_add:
-  title: Playground Mail Settings
-  description: Add new content.
+fancy_mail.email_settings_add:
+  title: Fancy Mail Settings
   parent: system.admin_config
-  route_name: playground_mail.email_settings
+  route_name: fancy_mail.email_settings
   weight: 1
