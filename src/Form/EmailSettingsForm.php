@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\playground_mail\Form;
+namespace Drupal\fancy_mail\Form;
 
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
@@ -8,7 +8,7 @@ use Drupal\node\Entity\NodeType;
 use Drupal\node\NodeTypeInterface;
 
 /**
- * Configure Playground Mail settings for this site.
+ * Configure Fancy Mail settings for this site.
  */
 class EmailSettingsForm extends ConfigFormBase {
 
