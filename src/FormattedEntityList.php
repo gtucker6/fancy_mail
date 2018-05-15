@@ -14,6 +14,7 @@ use Drupal\user\Entity\User;
 use Drupal\taxonomy\Entity\Term;
 use Drupal\user\EntityOwnerInterface;
 use Drupal\user\UserInterface;
+use Drupal\Core\Field\FieldItemListInterface;
 
 class FormattedEntityList {
 
@@ -54,10 +55,14 @@ class FormattedEntityList {
             $this->user = null;
         }
 
-        $this->user_values = $this->user->toArray();
+        if(!empty($this->user)) {
+          $this->user_values = $this->user->toArray();
+        }
+
         $this->entity = $entity;
         $this->entity_values = $entity->toArray();
     }
+
     public function getAllParams()
     {
         $params[$this->entity->getEntityTypeId()] = $this->processParamsEntity($this->entity);
@@ -73,88 +78,30 @@ class FormattedEntityList {
 
         return $this->params;
     }
-    function processParamsEntity(EntityInterface $entity) {
 
-        $entity_values = $entity->toArray();
+    public function processParamsEntity(EntityInterface $entity) {
+
+      if($entity instanceof UserInterface) {
+        $params['user']['role'] = implode(',', $entity->getRoles());
+        $params['user']['email'] = $entity->getEmail();
+      } else {
+        //loop through entity keys
+        $entity_values = array_keys($entity->toArray());
 
         $params[$entity->getEntityTypeId()] = [];
 
-        foreach($entity_values as $key => $value) {
-            $entity_key = $entity->get($key)->get(0);
-            if ((strpos($key, 'field_') !== false || $key === "title" || $key === "mail" || $key === "body") && $entity_key !== null) {
-                $new_key = str_replace('field_', "", $key);
-
-                if ($entity_key instanceof AddressItem) {
-                    $address_obj = $entity->get($key)->get(0);
-                    $new_address = "";
-                    if(trim($address_obj->getAddressLine1()) !== "") {
-                        $new_address .= $address_obj->getAddressLine1() . $address_obj->getAddressLine2() .", ";
-                    }
-                    $new_address .= $address_obj->getLocality() . ", ". $address_obj->getAdministrativeArea() . " ";
-                    $new_address .= $address_obj->getPostalCode();
-
-                    $params[$entity->getEntityTypeId()]['address'] = $new_address;
-
-                    $aa= str_replace("US-", "",$address_obj->getAdministrativeArea());
-                    $states = (new SubdivisionRepository())->getList(['US']);
-                    if(array_key_exists($aa, $states)) {
-                        $params[$entity->getEntityTypeId()]['state_name'] = $states[$aa];
-                    }
-
-                } else if(is_numeric($entity_key->getString()) && $entity_key instanceof EntityReferenceItem) {
-                    $term = Term::load((int)$entity_key->getString())->getName();
-                    $params[$entity->getEntityTypeId()][$new_key] = $term;
-
-                } else {
-                    $params[$entity->getEntityTypeId()][$new_key] = $entity_key->getString();
-
-                }
+        foreach ($entity_values as $key) {
+          $field_item_list = $entity->get($key);
+          if (strpos($key, 'field_') !== false || $key === "title" || $key === "mail" || $key === "body") {
+            if ($field_item_list instanceof FieldItemListInterface) {
+              $new_key = str_replace('field_', "", $key);
+              // attach render array view of field_item_list (will view default if mail_list is not found)
+              $params[$entity->getEntityTypeId()][$new_key] = $field_item_list->view('mail_list');
             }
+          }
         }
-
-        if($entity instanceof UserInterface) {
-            if($entity->hasRole('administrator')){
-                $params['user']['role'] = "Admin";
-            }
-        }
-
+      }
         return $params[$entity->getEntityTypeId()];
 
-    }
-
-    public function getOriginalDifferenceKeys() {
-        $differences = [];
-        if(isset($this->entity->original)) {
-            if(count($this->entity_values) >= count($this->entity->original->toArray())) {
-                $key_array = $this->entity_values;
-            } else {
-
-                $key_array = $this->entity->original->toArray();
-            }
-
-            foreach($key_array as $key => $value) {
-                $o_value = $this->entity->original->toArray()[$key][0];
-                $n_value = $this->entity->toArray()[$key][0];
-
-               if(!isset($o_value['attributes']) && isset($n_value['attributes'])) {
-                    $o_value['attributes'] = [];
-                }
-
-                if((strpos($key, "field_") !== false || $key === "title" || $key === "body") && $o_value !== $n_value) {
-                    $value_type = gettype($value[0]);
-                    $new_key = str_replace("field_", "", $key);
-                    if($value_type === "array") {
-                        foreach($value[0] as $sub_key => $sub_value) {
-                            if($o_value[$sub_key] !== $n_value[$sub_key]) {
-                                $differences[$new_key] = $this->entity->get($key)->getString();
-                            }
-                        }
-                    } else {
-                        $differences[$new_key] = $n_value;
-                    }
-                }
-            }
-        }
-        return $differences;
     }
 }
