@@ -128,22 +128,6 @@ class EmailSettingsForm extends ConfigFormBase {
         '#default_value'=> $settings->get('font_unit') ?: 'px',
     ];
 
-    $form['key_differences'] = [
-        '#type'=>'details',
-        '#title'=> $this->t("Entity Change Display Settings"),
-        '#description'=> $this->t('These settings are for emails sent after content has been changed and will affect how changes to this content are displayed to you.'),
-    ];
-
-      $form['key_differences']['color_highlight'] = [
-        '#type'=> 'checkboxes',
-        '#title'=> $this->t("Highlight Changes"),
-        '#options' => [
-            'field_key'=> $this->t("Highlight field key changes"),
-            'field_value'=>$this->t("Highlight field value changes"),
-        ],
-        '#default_value'=> $settings->get('color_highlight'),
-      ];
-
     return parent::buildForm($form, $form_state);
   }
 
@@ -173,8 +157,6 @@ class EmailSettingsForm extends ConfigFormBase {
       $settings->set('font_size', $form_state->getValue('font_size'))->save();
       $settings->set('font_unit', $form_state->getValue('font_unit'))->save();
 
-
-      $settings->set('color_highlight', $form_state->getValue('color_highlight'))->save();
 
       parent::submitForm($form, $form_state);
   }
