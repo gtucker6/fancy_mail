@@ -48,11 +48,9 @@
         div, label, span {
             font-size: {{ styles.font_size }};
         }
-        .highlight {
-            background-color: #92D18B;
-        }
-        .newhighlight {
-            background-color: #FFAAAA;
+
+        .bolder {
+            font-weight: bolder;
         }
 
         .main-row .btn-danger {
@@ -60,7 +58,7 @@
             background-color: #d9534f;
             border-color: #d43f3a;
         }
-       .main-row .btn-success {
+        .main-row .btn-success {
             color: #fff !important;
             background-color: #5cb85c;
             border-color: #4cae4c;
@@ -91,11 +89,7 @@
     </style>
 </head>
 <body>
-{% set highlight_settings = [
-    highlight.field_key ? "highlight" : "",
-    highlight.field_value ? "highlight" : "",
-] %}
-<h1>{{ node_type }} Changed: "{{ safe.node.title }}"</h1>
+<h1>{{ node_type }} Changed: {{ safe.node.title }}</h1>
 <div class="main-row">
     <!-- Begin Original node_type -->
     <section class="original-organization-info org-info">
@@ -105,25 +99,24 @@
                 <div class="user">
                     <h3>User Info</h3>
                     {% for key, value in safe.user %}
-                        <div class="row">
-                            <label>{{ (key|replace("_", " "))|capitalize }}:</label>
-                            <span>{{ value }}</span>
-                        </div>
+                        {% if value is not empty %}
+                            <div class="row">
+                                <label class="bolder">{{ (key|replace("_", " "))|capitalize }}:</label>
+                                <span>{{ value }}</span>
+                            </div>
+                        {% endif %}
                     {% endfor %}
                 </div>
             {% endif %}
             {% if safe.node is defined %}
                 <h3>Original {{ node_type }} Info</h3>
                 {% for key, value in safe.node%}
-                    <div class="row">
-                        {% if diffs[key] is defined %}
-                            <label class="{{ highlight_settings.0 }}">{{ (key|replace("_", " "))|capitalize }}:</label>
-                            <span class="{{ highlight_settings.1 }}">{{ value }}</span>
-                        {% else %}
-                            <label>{{ (key|replace("_", " "))|capitalize }}:</label>
+                    {% if value is not empty %}
+                        <div class="row">
+                            <label class="bolder">{{ (key|replace("_", " "))|capitalize }}:</label>
                             <span>{{ value }}</span>
-                        {% endif %}
-                    </div>
+                        </div>
+                    {% endif %}
                 {% endfor %}
             {% endif %}
         </div>
@@ -133,40 +126,39 @@
     <!-- Begin New node_type -->
     <section class="new-organization-info org-info">
         <div class="orgs-background">
-        <h2>After Change Information</h2><hr>
-        {% if user is defined %}
-            <div class="user">
-                <h3>User Info</h3>
-                {% for key, value in user %}
-                    <div class="row">
-                        <label>{{ (key|replace("_", " "))|capitalize }}:</label>
-                        <span>{{ value }}</span>
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
-        {% if node is defined %}
-            <h3>New {{ node_type }} Info</h3>
-            {% for key, value in node %}
-                <div class="row">
-                    {% if diffs[key] is defined %}
-                        <label class="new{{ highlight_settings.0 }}">{{ (key|replace("_", " "))|capitalize }}:</label>
-                        <span class="new{{ highlight_settings.1 }}">{{ value }}</span>
-                    {% else %}
-                        <label>{{ (key|replace("_", " "))|capitalize }}:</label>
-                        <span>{{ value }}</span>
-                    {% endif %}
+            <h2>After Change Information</h2><hr>
+            {% if user is defined %}
+                <div class="user">
+                    <h3>User Info</h3>
+                    {% for key, value in user %}
+                        {% if value is not empty %}
+                            <div class="row">
+                                <label class="bolder">{{ (key|replace("_", " "))|capitalize }}:</label>
+                                <span>{{ value }}</span>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
                 </div>
-            {% endfor %}
-        {% endif %}
+            {% endif %}
+            {% if node is defined %}
+                <h3>New {{ node_type }} Info</h3>
+                {% for key, value in node %}
+                    {% if value is not empty %}
+                        <div class="row">
+                            <label class="bolder">{{ (key|replace("_", " "))|capitalize }}:</label>
+                            <span>{{ value }}</span>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
         </div>
     </section>
 </div>
-    <!-- End New node_type -->
+<!-- End New node_type -->
 <div class="main-row">
     <section id="change-info">
         {% if admin_options is not empty %}
-            <h2>Update this Revision</h2>
+            <h2>Update this {{ node_type }}</h2>
             <a class="btn btn-success" href="{{ admin_options.accept }}">Accept</a>
             <a class="btn btn-danger" href="{{ admin_options.delete }}">Delete</a>
         {% endif %}
