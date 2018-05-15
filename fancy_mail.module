@@ -53,9 +53,7 @@ function fancy_mail_theme() {
                 'node'=> [],
                 'node_type'=> '',
                 'user'=>[],
-                'diffs'=> NULL,
                'admin_options'=> NULL,
-                'highlight'=> NULL,
             ],
         ],
     ];
@@ -97,8 +95,8 @@ function fancy_mail_mail($key, &$message, $params) {
             ];
             $message['subject'] = t('New @node_type added @state: @title', array(
                 '@node_type'=> $params['node_type'],
-                '@state'=> $params['node']['state_name']? "in ".$params['node']['state_name']:"",
-                '@title' => $params['node']['title']), $options);
+                '@state'=> isset($params['safe']['node']['state_name']) ? "in ".$params['node']['state_name'] : "",
+                '@title' => isset($params['safe']['node']['title'][0]['#context']['value']) ? $params['node']['title'][0]['#context']['value'] : ""), $options);
             $message['body'][] = $renderer->renderPlain($create_node_body);
             break;
 
@@ -117,15 +115,13 @@ function fancy_mail_mail($key, &$message, $params) {
                 '#node_type'=> $params['node_type'],
                 '#user' => $params['user'] ?: [],
                 '#safe' => $params['safe'] ?: [],
-                '#diffs' => $params['diffs'] ?: NULL,
-                '#highlight' => $params['highlight']['changes'] ?: NULL,
                 '#admin_options' => $params['admin_options'] ?: NULL,
             ];
 
             $message['subject'] = t('@node_type has been changed @state: @title', array(
                 '@node_type'=> $params['node_type'],
-                '@state'=> $params['node']['state_name']? "in ".$params['node']['state_name']:"",
-                '@title' => $params['node']['title']), $options);
+                '@state'=> isset($params['safe']['node']['state_name']) ? "in ".$params['node']['state_name'] : "",
+                '@title' => isset($params['safe']['node']['title'][0]['#context']['value']) ? $params['node']['title'][0]['#context']['value'] : ""), $options);
 
             $message['body'][] = $renderer->renderPlain($change_node_body);
             break;
@@ -142,8 +138,9 @@ function fancy_mail_node_insert(\Drupal\node\NodeInterface $node) {
 
     $is_admin = in_array("administrator", \Drupal::currentUser()->getRoles()) ?: false;
     $is_checked_admin = (\Drupal::config('fancy_mail.settings')->get('send_to_admins') !== 0) ?: false;
+    $is_anonymous = !\Drupal::currentUser()->isAnonymous();
 
-    if($content_type_selected && (!$is_admin || $is_checked_admin)) {
+    if($content_type_selected && (!$is_admin || $is_checked_admin) && !$is_anonymous) {
 
         $mailManager = \Drupal::service('plugin.manager.mail');
 
@@ -174,8 +171,9 @@ function fancy_mail_node_presave(\Drupal\node\NodeInterface $node) {
 
     $content_types = \Drupal::config('fancy_mail.settings')->get('content_type_notify') ?: [];
     $content_type_selected = in_array($node->getType(), $content_types, TRUE);
+    $is_anonymous = !\Drupal::currentUser()->isAnonymous();
 
-    if(!$content_type_selected){
+    if(!$content_type_selected || $is_anonymous){
         return;
     }
     else {
@@ -188,11 +186,8 @@ function fancy_mail_node_presave(\Drupal\node\NodeInterface $node) {
                 $node->isDefaultRevision(false);
             }
 
-            $differences = (new FormattedEntityList($node))->getOriginalDifferenceKeys();
-
-            $node->setRevisionLogMessage(t("Changed by @user. Changes were made on the following fields: @diffs", [
+            $node->setRevisionLogMessage(t("Changed by @user.", [
                 '@user' => \Drupal::currentUser()->getEmail(),
-                '@diffs' => implode(", ", $differences),
             ]));
 
 
@@ -216,30 +211,18 @@ function fancy_mail_node_update(\Drupal\node\NodeInterface $node) {
     $content_types = \Drupal::config('fancy_mail.settings')->get('content_type_notify') ?: [];
     $content_type_selected = in_array($node->getType(), $content_types, TRUE);
 
+    $is_anonymous = !\Drupal::currentUser()->isAnonymous();
     $is_admin = in_array("administrator", \Drupal::currentUser()->getRoles()) ?: false;
     $is_checked_admin = (\Drupal::config('fancy_mail.settings')->get('send_to_admins') !== 0) ?: false;
 
-    if($content_type_selected && (!$is_admin || $is_checked_admin)) {
+    if($content_type_selected && (!$is_admin || $is_checked_admin) && !$is_anonymous) {
         /** @var FormattedEntityList $properties */
         $properties = new FormattedEntityList($node);
         $params = $properties->getAllParams();
-        $differences = $properties->getOriginalDifferenceKeys();
 
         /** @var FormattedEntityList $original_properties */
         $original_properties = new FormattedEntityList($node->original);
         $params['safe'] = $original_properties->getAllParams();
-        $params['diffs'] = $differences;
-        $highlight = \Drupal::config('fancy_mail.settings')->get('color_highlight');
-        if($highlight !== NULL) {
-            $params['highlight']['changes'] = [];
-            foreach($highlight as $key => $property) {
-                if($property === 0){
-                    $params['highlight']['changes'][$key] = false;
-                } else {
-                    $params['highlight']['changes'][$key] = true;
-                }
-            }
-        }
 
 
         if($node->getRevisionId() !== NULL) {
@@ -252,7 +235,7 @@ function fancy_mail_node_update(\Drupal\node\NodeInterface $node) {
         $key = 'mail_change_node';
         $to = \Drupal::config('fancy_mail.settings')->get('to_email');
 
-        if(isset($to) && count($params['diffs']) > 0 && !\Drupal::currentUser()->isAnonymous()) {
+        if(isset($to)) {
             $send = true;
         } else {
             $send = false;
