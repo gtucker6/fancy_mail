@@ -4,6 +4,7 @@ namespace Drupal\fancy_mail\Form;
 
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\node\NodeTypeInterface;
 
@@ -56,18 +57,16 @@ class EmailSettingsForm extends ConfigFormBase {
       $content_types = NodeType::loadMultiple();
 
       foreach($content_types as $content_type) {
-          if($content_type instanceof NodeTypeInterface) {
-              $options[$content_type->id()] = $content_type->label();
-          }
+        if($content_type instanceof NodeTypeInterface) {
+            $options[$content_type->id()] = $content_type->label();
+        }
       }
 
     $form['email_process']['content_type_notify'] = [
       '#type'=> 'checkboxes',
       '#title'=> $this->t("Select which content types to notify you about updates on"),
       '#options'=> $options,
-      '#default_value'=> $settings->get('content_type_notify'),
-
-
+      '#default_value'=> $settings->get('content_type_notify') ?: [],
     ];
 
     $form['styles'] = [
@@ -127,7 +126,7 @@ class EmailSettingsForm extends ConfigFormBase {
         ],
         '#default_value'=> $settings->get('font_unit') ?: 'px',
     ];
-
+    
     return parent::buildForm($form, $form_state);
   }
 
